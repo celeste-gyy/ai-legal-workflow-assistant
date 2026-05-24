@@ -2,59 +2,104 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import LanguageSwitcher from '@/components/LanguageSwitcher';
+import {
+  defaultLanguage,
+  isLanguage,
+  languageStorageKey,
+  translations,
+  type Language,
+} from '@/lib/i18n';
+
+function getInitialLanguage(): Language {
+  if (typeof window === 'undefined') {
+    return defaultLanguage;
+  }
+
+  const storedLanguage = localStorage.getItem(languageStorageKey);
+  return isLanguage(storedLanguage) ? storedLanguage : defaultLanguage;
+}
 
 export default function QuestionPage() {
   const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [language, setLanguage] = useState<Language>(getInitialLanguage);
   const router = useRouter();
+  const t = translations[language];
+
+  const handleLanguageChange = (nextLanguage: Language) => {
+    setLanguage(nextLanguage);
+    localStorage.setItem(languageStorageKey, nextLanguage);
+  };
 
   const handleSubmit = async () => {
     if (!question.trim()) {
-      setError('请输入你的法律问题');
+      setError(t.question.emptyError);
       return;
     }
     setLoading(true);
     setError('');
 
     try {
+      const messages = [{ role: 'user', content: question.trim() }];
       const res = await fetch('/api/ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question }),
+        body: JSON.stringify({ messages }),
       });
 
       if (!res.ok) throw new Error('请求失败');
       const data = await res.json();
+      const conversation = [
+        ...messages,
+        { role: 'assistant', content: JSON.stringify(data) },
+      ];
 
-      // 将结果编码后传递给答案页
-      const resultParam = encodeURIComponent(JSON.stringify(data));
-      router.push(`/answer?result=${resultParam}`);
-    } catch (err) {
-      setError('获取回答失败，请重试');
+      sessionStorage.setItem(
+        'legal-ai-contract-workflow-conversation',
+        JSON.stringify({ messages: conversation, result: data })
+      );
+      router.push('/answer');
+    } catch {
+      setError(t.question.requestError);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center p-24">
-      <h1 className="text-3xl font-bold mb-6">输入你的法律问题</h1>
-      <textarea
-        className="w-full max-w-2xl h-40 p-4 border rounded-lg text-black"
-        value={question}
-        onChange={(e) => setQuestion(e.target.value)}
-        placeholder="例如：公司可以无理由辞退试用期员工吗？"
-        disabled={loading}
-      />
-      {error && <p className="text-red-500 mt-2">{error}</p>}
-      <button
-        onClick={handleSubmit}
-        disabled={loading}
-        className="mt-4 rounded-md bg-green-600 px-6 py-3 text-white hover:bg-green-700 disabled:opacity-50"
-      >
-        {loading ? '正在咨询 AI...' : '提交问题'}
-      </button>
+    <main className="min-h-screen bg-gray-50 px-5 py-6 text-gray-950 sm:px-8">
+      <div className="mx-auto w-full max-w-4xl">
+        <div className="mb-10 flex justify-end">
+          <LanguageSwitcher
+            language={language}
+            onChange={handleLanguageChange}
+          />
+        </div>
+        <section className="rounded-lg border border-gray-200 bg-white p-6">
+          <p className="text-sm font-semibold uppercase tracking-wide text-gray-500">
+            {t.question.workflowLabel}
+          </p>
+          <h1 className="mt-2 text-3xl font-bold">{t.question.title}</h1>
+          <p className="mt-2 text-sm text-gray-600">{t.common.subtitle}</p>
+          <textarea
+            className="mt-6 h-40 w-full rounded-md border border-gray-300 p-4 text-black outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            placeholder={t.question.placeholder}
+            disabled={loading}
+          />
+          {error && <p className="mt-2 text-red-500">{error}</p>}
+          <button
+            onClick={handleSubmit}
+            disabled={loading}
+            className="mt-4 rounded-md bg-gray-900 px-6 py-3 font-semibold text-white hover:bg-gray-800 disabled:opacity-50"
+          >
+            {loading ? t.question.loading : t.question.submit}
+          </button>
+        </section>
+      </div>
     </main>
   );
 }

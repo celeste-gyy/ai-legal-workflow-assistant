@@ -1,12 +1,12 @@
 {
-  "name": "legal-ai-trust",
+  "name": "ai-legal-workflow-assistant",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev -H localhost",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "eslint ."
   },
   "dependencies": {
     "next": "16.2.6",
